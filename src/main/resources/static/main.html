@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>АвтоИмпорт 2026 · Калькулятор растаможки + доставка</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .ticker-wrap {
+            width: 100%;
+            overflow: hidden;
+            background: #0b1e33;
+            color: white;
+            padding: 6px 0;
+            border-bottom: 1px solid #2d4a6e;
+        }
+        .ticker {
+            display: inline-block;
+            white-space: nowrap;
+            animation: tickerMove 28s linear infinite;
+        }
+        .ticker span { margin-right: 40px; font-weight: 500; }
+        .ticker i { font-style: normal; margin: 0 8px; color: #9ac7ff; }
+        @keyframes tickerMove {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .modal-overlay {
+            transition: opacity 0.2s ease, visibility 0.2s;
+        }
+        .calc-card {
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(10px);
+        }
+        .power-unit-toggle {
+            display: flex;
+            background: #f1f5f9;
+            border-radius: 40px;
+            padding: 3px;
+        }
+        .power-unit-toggle button {
+            border-radius: 40px;
+            padding: 6px 18px;
+            font-weight: 500;
+            transition: all 0.1s;
+        }
+        .power-unit-toggle button.active {
+            background: #1e3a8a;
+            color: white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .loader {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #1e3a8a;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .step-btn {
+            transition: all 0.15s;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50/40 min-h-screen">
+
+<!-- БЕГУЩАЯ СТРОКА КУРСОВ -->
+<div class="ticker-wrap shadow-sm">
+    <div class="ticker" id="currencyTicker"><span>Загрузка курсов ЦБ...</span></div>
+</div>
+
+<header class="bg-white/70 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+        <div class="text-xl font-bold bg-gradient-to-r from-blue-800 to-indigo-700 bg-clip-text text-transparent">🚗 ИмпортАвто.РФ</div>
+        <nav class="flex gap-1 sm:gap-4 text-sm sm:text-base font-medium">
+            <button id="openCatalogBtn" class="px-3 sm:px-5 py-2 rounded-full hover:bg-blue-50 transition text-slate-700">📋 Каталог льготных авто</button>
+            <a href="#calculator" class="px-3 sm:px-5 py-2 rounded-full hover:bg-blue-50 transition text-slate-700">🧮 Калькулятор</a>
+            <button id="showRoadmapBtn" class="px-3 sm:px-5 py-2 rounded-full hover:bg-blue-50 transition text-slate-700">🗺️ Пошаговая инструкция</button>
+        </nav>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 py-6 sm:py-8">
+    <div class="text-center mb-8">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-slate-800 tracking-tight">Импорт авто из Китая, Японии, Грузии, Кореи</h1>
+        <p class="text-lg text-slate-600 mt-3 max-w-3xl mx-auto">Бесплатный сервис расчёта стоимости «под ключ» + доставка по РФ.</p>
+    </div>
+
+    <!-- КАЛЬКУЛЯТОР (только таможенные платежи) -->
+    <div id="calculator" class="calc-card rounded-3xl shadow-xl border border-white/30 p-5 sm:p-7 mb-10">
+        <h2 class="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-5"><span>🧾 Стоимость растаможки (пошлина, сбор, утиль, НДС, логистика)</span><span class="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">расчёт на сервере</span></h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div><label class="block text-sm font-medium text-slate-700 mb-1">Стоимость авто</label><div class="flex gap-2"><input type="number" id="carPrice" value="15000" step="100" min="0" class="w-full rounded-xl border-slate-300 shadow-sm"><select id="priceCurrency" class="w-28 rounded-xl border-slate-300 shadow-sm bg-white"><option value="USD" selected>USD $</option><option value="EUR">EUR €</option><option value="CNY">CNY ¥</option><option value="JPY">JPY ¥</option><option value="KRW">KRW ₩</option></select></div></div>
+            <div><label class="block text-sm font-medium text-slate-700 mb-1">Объем, см³</label><input type="number" id="engineVolume" value="2000" min="1" step="100" class="w-full rounded-xl border-slate-300 shadow-sm"></div>
+            <div><label class="block text-sm font-medium text-slate-700 mb-1">Мощность</label><div class="flex items-center gap-2"><input type="number" id="powerValue" value="150" step="1" min="0" max="160" class="w-full rounded-xl border-slate-300 shadow-sm"><div class="power-unit-toggle text-sm"><button id="powerHpBtn" class="active" data-unit="hp">л.с.</button><button id="powerKwBtn" data-unit="kw">кВт</button></div></div></div>
+            <div><label class="block text-sm font-medium text-slate-700 mb-1">Возраст авто</label><select id="ageCategory" class="w-full rounded-xl border-slate-300 shadow-sm"><option value="NEW" selected>меньше 3-х лет (New)</option><option value="FRESH">3–5 лет (Fresh)</option><option value="OLD">5–7 лет (Old)</option><option value="VINTAGE">больше 7 лет (Vintage)</option></select></div>
+            <div><label class="block text-sm font-medium text-slate-700 mb-1">Ввозит</label><select id="importerType" class="w-full rounded-xl border-slate-300 shadow-sm"><option value="INDIVIDUAL" selected>физическое лицо</option><option value="LEGAL">юридическое лицо</option></select></div>
+            <div><label class="block text-sm font-medium text-slate-700 mb-1">Страна импорта</label><select id="importCountry" class="w-full rounded-xl border-slate-300 shadow-sm"><option value="CN">🇨🇳 Китай</option><option value="JP">🇯🇵 Япония</option><option value="GE">🇬🇪 Грузия</option><option value="KR">🇰🇷 Корея</option></select></div>
+        </div>
+        <div class="mt-8 p-5 bg-gradient-to-r from-blue-900/5 to-indigo-900/5 rounded-2xl border border-blue-200/40">
+            <div class="flex flex-wrap items-baseline justify-between gap-4">
+                <div><span class="text-sm uppercase tracking-wider text-slate-500">Таможенные платежи (₽)</span><div class="text-4xl font-bold text-slate-800 mt-1" id="finalPriceRUB">— ₽</div><div class="text-sm text-slate-500 flex flex-wrap gap-x-4 gap-y-1 mt-1" id="priceDetails"></div></div>
+                <div class="bg-white/70 rounded-xl px-5 py-3 shadow-sm"><span class="text-sm text-slate-600">В т.ч. утильсбор: </span><span class="font-bold text-lg" id="utilFeeDisplay">— ₽</span></div>
+            </div>
+            <div class="text-xs text-slate-400 mt-3" id="appliedRatesInfo"></div>
+        </div>
+    </div>
+
+    <!-- БЛОК 5 ЭТАПОВ С ПОПАПАМИ -->
+    <div id="roadmapSection" class="mb-12 scroll-mt-20">
+        <div class="flex items-center justify-between mb-3"><h3 class="text-2xl font-bold text-slate-800">📌 Пошаговая инструкция импорта</h3><span class="text-sm bg-slate-200 px-4 py-1 rounded-full">выберите страну</span></div>
+        <div class="flex flex-wrap gap-2 mb-5">
+            <button data-country-tab="CN" class="country-tab px-5 py-2 rounded-full text-sm font-medium bg-blue-600 text-white shadow">Китай</button>
+            <button data-country-tab="JP" class="country-tab px-5 py-2 rounded-full text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300">Япония</button>
+            <button data-country-tab="GE" class="country-tab px-5 py-2 rounded-full text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300">Грузия</button>
+            <button data-country-tab="KR" class="country-tab px-5 py-2 rounded-full text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300">Корея</button>
+        </div>
+
+        <!-- 5 кнопок этапов -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+            <button data-step="1" class="step-btn bg-white border border-slate-200 rounded-xl p-3 text-center hover:shadow-md transition">1️⃣ Покупка авто</button>
+            <button data-step="2" class="step-btn bg-white border border-slate-200 rounded-xl p-3 text-center hover:shadow-md transition">2️⃣ Доставка до РФ</button>
+            <button data-step="3" class="step-btn bg-white border border-slate-200 rounded-xl p-3 text-center hover:shadow-md transition">3️⃣ Доставка по РФ</button>
+            <button data-step="4" class="step-btn bg-white border border-slate-200 rounded-xl p-3 text-center hover:shadow-md transition">4️⃣ Таможенное оформление</button>
+            <button data-step="5" class="step-btn bg-white border border-slate-200 rounded-xl p-3 text-center hover:shadow-md transition">5️⃣ Постановка на учёт</button>
+        </div>
+
+        <!-- Блок общей стоимости с доп. расходами -->
+        <div class="mt-6 p-5 bg-gradient-to-r from-emerald-900/10 to-teal-900/10 rounded-2xl border border-emerald-200/40">
+            <div class="flex flex-wrap justify-between items-center gap-3">
+                <div><span class="text-sm uppercase tracking-wider text-slate-600">Полная стоимость (с учётом всех этапов)</span><div class="text-3xl font-bold text-slate-800" id="fullTotalPrice">— ₽</div><div class="text-xs text-slate-500 mt-1" id="fullTotalBreakdown"></div></div>
+                <button id="recalcFullTotal" class="bg-emerald-600 text-white text-sm px-4 py-2 rounded-full hover:bg-emerald-700 transition">⟳ Пересчитать итог</button>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- МОДАЛЬНОЕ ОКНО ДЛЯ ЭТАПОВ -->
+<div id="stepModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center invisible opacity-0 bg-black/40 backdrop-blur-sm transition-all">
+    <div class="bg-white rounded-2xl max-w-2xl w-[90%] max-h-[85vh] overflow-y-auto p-6 shadow-2xl relative">
+        <button id="closeModalBtn" class="absolute top-3 right-4 text-2xl text-slate-400 hover:text-slate-800">&times;</button>
+        <div id="modalContent" class="pr-4"></div>
+        <div class="mt-6 flex justify-end"><button id="modalConfirmBtn" class="bg-blue-600 text-white px-5 py-2 rounded-full text-sm hover:bg-blue-700">Закрыть</button></div>
+    </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО КАТАЛОГА -->
+<div id="catalogModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center invisible opacity-0 bg-black/40 backdrop-blur-sm transition-all">
+    <div class="bg-white rounded-3xl max-w-5xl w-[90%] max-h-[85vh] overflow-y-auto p-6 shadow-2xl"><div class="flex justify-between items-center mb-5"><h2 class="text-2xl font-bold">🚘 Льготный каталог (пониженный утильсбор)</h2><button id="closeCatalogBtn" class="text-3xl leading-6 text-slate-400 hover:text-slate-800">&times;</button></div><div id="catalogGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div><div class="flex justify-center mt-6"><button id="loadMoreCatalogBtn" class="px-5 py-2 bg-blue-600 text-white rounded-full text-sm hover:bg-blue-700 hidden">Загрузить ещё</button></div><p class="text-xs text-slate-400 mt-6 text-center">* Актуальные модели из базы. Фото носят иллюстративный характер.</p></div>
+</div>
+
+<script>
+    (function(){
+        "use strict";
+
+        // ---------- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ----------
+        let exchangeRates = { USD: 90, EUR: 98, CNY: 12.5, JPY: 0.62, KRW: 0.068 };
+        let currentCatalogPage = 0;
+        const CATALOG_SIZE = 20;
+        let isLoadingCatalog = false;
+        let hasMoreCatalog = true;
+
+        // Данные для стран (все сайты из вашего списка)
+        const countryData = {
+            CN: {
+                name: "Китай",
+                sites: [
+                    { name: "Autohome", url: "https://www.autohome.com.cn" },
+                    { name: "Dongchedi (懂车帝)", url: "https://www.dongchedi.com" },
+                    { name: "Guazi", url: "https://www.guazi.com" },
+                    { name: "Uxin", url: "https://www.xin.com" },
+                    { name: "Alibaba", url: "https://www.alibaba.com" },
+                    { name: "Made-in-China", url: "https://www.made-in-china.com" },
+                    { name: "BitAuto", url: "https://www.yiche.com" }
+                ],
+                costsList: [
+                    "Оформление экспортной лицензии: $300 – $500",
+                    "Комиссия экспортного агента: $500 – $1,000",
+                    "Снятие с учёта и транзитные номера: $150",
+                    "Доставка до границы/порта: $500 – $1,200",
+                    "Фрахт/Перегон через границу: $500 – $800"
+                ],
+                totalCostAvgUsd: 2750
+            },
+            JP: {
+                name: "Япония",
+                sites: [
+                    { name: "Goo-net Exchange", url: "https://www.goo-net-exchange.com" },
+                    { name: "Car Sensor", url: "https://www.carsensor.net" },
+                    { name: "Yahoo Japan Auctions", url: "https://auctions.yahoo.co.jp" },
+                    { name: "SBT Japan", url: "https://www.sbtjapan.com" },
+                    { name: "Be Forward", url: "https://www.beforward.jp" }
+                ],
+                costsList: [
+                    "Аукционный сбор: $150 – $250",
+                    "Утилизационный сбор (Япония): ~$100",
+                    "Услуги экспортного агента: $400 – $600",
+                    "Доставка по Японии до порта: $100 – $500",
+                    "Фрахт до Владивостока: $500 – $2,800"
+                ],
+                totalCostAvgUsd: 1500
+            },
+            GE: {
+                name: "Грузия",
+                sites: [
+                    { name: "MyAuto.ge", url: "https://myauto.ge" },
+                    { name: "Autopapa.ge", url: "https://autopapa.ge" },
+                    { name: "Manqanebi.ge", url: "https://manqanebi.ge" }
+                ],
+                costsList: [
+                    "Услуги автоподборщика: $300 – $500",
+                    "Экспортное переоформление: $100 – $200",
+                    "Транзитные номера и страховка: $50",
+                    "Доставка автовозом до границы РФ: $400 – $700"
+                ],
+                totalCostAvgUsd: 1100
+            },
+            KR: {
+                name: "Корея",
+                sites: [
+                    { name: "Encar.com", url: "https://www.encar.com" },
+                    { name: "Autowini.com", url: "https://www.autowini.com" },
+                    { name: "K Car", url: "https://www.kcar.co.kr" },
+                    { name: "Heydealer", url: "https://www.heydealer.com" }
+                ],
+                costsList: [
+                    "Дилерский сбор: ~$330",
+                    "Снятие с учёта и экспортная декларация: $200",
+                    "Услуги агента: $500 – $800",
+                    "Доставка до порта: $150 – $300",
+                    "Фрахт до Владивостока: $600 – $1,000"
+                ],
+                totalCostAvgUsd: 2050
+            }
+        };
+
+        let currentCountry = 'CN';
+        let customsCostRub = 0;          // результат основного калькулятора (только таможня)
+        let extraCostsRub = 0;           // расходы из этапа 2 (средние в $, пересчитанные по курсу)
+        let transitCostRub = 0;          // доставка по РФ из этапа 3
+        const sbktsCostRub = 45000;      // фиксированная стоимость СБКТС+ЭПТС (максимум 45000 ₽)
+
+        // DOM элементы
+        const tickerEl = document.getElementById('currencyTicker');
+        const modalOverlay = document.getElementById('stepModal');
+        const modalContent = document.getElementById('modalContent');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+        const openCatalogBtn = document.getElementById('openCatalogBtn');
+        const catalogModal = document.getElementById('catalogModal');
+        const closeCatalogBtn = document.getElementById('closeCatalogBtn');
+        const catalogGrid = document.getElementById('catalogGrid');
+        const loadMoreBtn = document.getElementById('loadMoreCatalogBtn');
+
+        const priceInput = document.getElementById('carPrice');
+        const currencySelect = document.getElementById('priceCurrency');
+        const volumeInput = document.getElementById('engineVolume');
+        const powerInput = document.getElementById('powerValue');
+        const ageSelect = document.getElementById('ageCategory');
+        const importerSelect = document.getElementById('importerType');
+        const countrySelect = document.getElementById('importCountry');
+        const hpBtn = document.getElementById('powerHpBtn');
+        const kwBtn = document.getElementById('powerKwBtn');
+        const finalPriceSpan = document.getElementById('finalPriceRUB');
+        const detailsSpan = document.getElementById('priceDetails');
+        const utilSpan = document.getElementById('utilFeeDisplay');
+        const appliedRatesInfo = document.getElementById('appliedRatesInfo');
+        const fullTotalSpan = document.getElementById('fullTotalPrice');
+        const fullTotalBreakdown = document.getElementById('fullTotalBreakdown');
+
+        let powerUnit = 'hp';
+        const HP_LIMIT = 160;
+        const KW_LIMIT = (HP_LIMIT / 1.35962).toFixed(1);
+
+        // ---------- Утилиты ----------
+        function formatNumber(num) { return new Intl.NumberFormat('ru-RU').format(Math.round(num)); }
+        function enforcePowerLimit() {
+            let val = parseFloat(powerInput.value) || 0;
+            if (powerUnit === 'hp') { if (val > HP_LIMIT) powerInput.value = HP_LIMIT; if (val < 0) powerInput.value = 0; }
+            else { if (val > KW_LIMIT) powerInput.value = KW_LIMIT; if (val < 0) powerInput.value = 0; }
+        }
+        function getPowerHp() {
+            let val = parseFloat(powerInput.value) || 0;
+            if (powerUnit === 'kw') val = val * 1.35962;
+            return Math.min(val, HP_LIMIT);
+        }
+
+        // Обновление полной стоимости (таможня + этап2 + этап3 + СБКТС)
+        function updateFullTotal() {
+            let total = customsCostRub + extraCostsRub + transitCostRub + sbktsCostRub;
+            fullTotalSpan.textContent = formatNumber(total) + ' ₽';
+            let parts = [];
+            if (extraCostsRub > 0) parts.push(`расходы на доставку до РФ: ${formatNumber(extraCostsRub)} ₽`);
+            if (transitCostRub > 0) parts.push(`доставка по РФ: ${formatNumber(transitCostRub)} ₽`);
+            parts.push(`оформление СБКТС/ЭПТС: ${formatNumber(sbktsCostRub)} ₽`);
+            fullTotalBreakdown.innerHTML = parts.join(' · ');
+        }
+
+        // Пересчёт extraCostsRub из долларов (по текущему курсу USD)
+        function updateExtraCostsFromUsd(avgUsd) {
+            const usdRate = exchangeRates.USD || 90;
+            extraCostsRub = avgUsd * usdRate;
+            updateFullTotal();
+        }
+
+        // ---------- КУРСЫ ЦБ ----------
+        async function fetchExchangeRates() {
+            try {
+                const res = await fetch('/api/currency/rates');
+                if (!res.ok) throw new Error();
+                const rates = await res.json();
+                const newRates = {};
+                rates.forEach(v => { let val = parseFloat(v.value.replace(',', '.')); newRates[v.charCode] = val / v.nominal; });
+                if (newRates.USD) exchangeRates.USD = newRates.USD;
+                if (newRates.EUR) exchangeRates.EUR = newRates.EUR;
+                if (newRates.CNY) exchangeRates.CNY = newRates.CNY;
+                if (newRates.JPY) exchangeRates.JPY = newRates.JPY;
+                if (newRates.KRW) exchangeRates.KRW = newRates.KRW;
+                updateTicker();
+                if (extraCostsRub > 0) {
+                    const country = countryData[currentCountry];
+                    if (country) updateExtraCostsFromUsd(country.totalCostAvgUsd);
+                }
+            } catch(e) { console.warn('Курсы не загружены'); updateTicker(true); }
+        }
+        function updateTicker(isError=false) {
+            const d = exchangeRates;
+            const date = new Date().toLocaleDateString('ru',{day:'numeric',month:'short'});
+            if(isError) { tickerEl.innerHTML = `<span>⚠️ Курсы обновляются...</span>`; return; }
+            tickerEl.innerHTML = `<span>🇷🇺 ЦБ РФ · ${date}</span><span>💵 USD ${d.USD?.toFixed(2)||'—'} <i>₽</i></span><span>💶 EUR ${d.EUR?.toFixed(2)||'—'} <i>₽</i></span><span>🇨🇳 CNY ${d.CNY?.toFixed(2)||'—'} <i>₽</i></span><span>🇯🇵 JPY ${d.JPY?.toFixed(2)||'—'} <i>₽</i></span><span>🇰🇷 KRW ${d.KRW?.toFixed(4)||'—'} <i>₽</i></span><span>🇷🇺 ЦБ РФ · ${date}</span><span>💵 USD ${d.USD?.toFixed(2)||'—'} <i>₽</i></span><span>💶 EUR ${d.EUR?.toFixed(2)||'—'} <i>₽</i></span><span>🇨🇳 CNY ${d.CNY?.toFixed(2)||'—'} <i>₽</i></span><span>🇯🇵 JPY ${d.JPY?.toFixed(2)||'—'} <i>₽</i></span><span>🇰🇷 KRW ${d.KRW?.toFixed(4)||'—'} <i>₽</i></span>`;
+        }
+
+        // ---------- ОСНОВНОЙ КАЛЬКУЛЯТОР (только таможня) ----------
+        let calcTimeout = null;
+        function triggerCalc() { if(calcTimeout) clearTimeout(calcTimeout); calcTimeout = setTimeout(calculateMain, 500); }
+        async function calculateMain() {
+            const price = parseFloat(priceInput.value) || 0;
+            const currency = currencySelect.value;
+            const engineVolumeCc = parseInt(volumeInput.value,10) || 0;
+            let powerHp = Math.round(getPowerHp());
+            if(powerHp > HP_LIMIT) powerHp = HP_LIMIT;
+            const body = { price, currency, engineVolumeCc, powerHp, ageCategory: ageSelect.value, importerType: importerSelect.value, importCountry: countrySelect.value };
+            if(price<=0 || engineVolumeCc<1 || powerHp<1) { finalPriceSpan.textContent='— ₽'; return; }
+            finalPriceSpan.innerHTML = '<span class="loader"></span> расчёт...';
+            try {
+                const resp = await fetch('/api/calculator/calculate', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+                if(!resp.ok) throw new Error();
+                const data = await resp.json();
+                customsCostRub = data.totalPriceRub;   // это только таможенные платежи
+                finalPriceSpan.textContent = formatNumber(customsCostRub) + ' ₽';
+                const d = data.details;
+                let cf = (d.customsFee != null && !isNaN(d.customsFee)) ? d.customsFee : 0;
+                detailsSpan.innerHTML = `💰 пошлина ${formatNumber(d.customsDuty)} ₽ · сбор ${formatNumber(cf)} ₽ · утиль ${formatNumber(d.utilizationFee)} ₽ · НДС ${formatNumber(d.vat)} ₽ · логистика ${formatNumber(d.logistics)} ₽`;
+                utilSpan.textContent = formatNumber(d.utilizationFee) + ' ₽';
+                appliedRatesInfo.innerHTML = `📊 Курс ${currency} = ${data.appliedRates.exchangeRate.toFixed(2)} ₽`;
+                updateFullTotal();
+            } catch(e) { finalPriceSpan.textContent='Ошибка'; detailsSpan.textContent='Ошибка расчёта'; }
+        }
+
+        // ---------- МОДАЛЬНЫЕ ОКНА ДЛЯ ЭТАПОВ ----------
+        function openModal(contentHtml) {
+            modalContent.innerHTML = contentHtml;
+            modalOverlay.classList.remove('invisible','opacity-0');
+            modalOverlay.classList.add('visible','opacity-100');
+        }
+        function closeModal() { modalOverlay.classList.add('invisible','opacity-0'); }
+
+        function getStep1Content() {
+            const data = countryData[currentCountry];
+            let html = `<h3 class="text-xl font-bold mb-3">🌐 Сайты для поиска авто в ${data.name}</h3><ul class="space-y-2">`;
+            data.sites.forEach(s => html += `<li><a href="${s.url}" target="_blank" rel="noopener" class="text-blue-600 underline">${s.name}</a></li>`);
+            html += `</ul><p class="text-sm text-slate-500 mt-4">Рекомендуется проверять несколько площадок.</p>`;
+            return html;
+        }
+        function getStep2Content() {
+            const data = countryData[currentCountry];
+            let html = `<h3 class="text-xl font-bold mb-3">💰 Дополнительные расходы при доставке до РФ (${data.name})</h3><ul class="list-disc pl-5 space-y-1 mb-4">`;
+            data.costsList.forEach(c => html += `<li>${c}</li>`);
+            html += `</ul><div class="bg-slate-100 p-3 rounded-lg"><span class="font-semibold">💰 Итого доп. расходов (среднее):</span> ~${data.totalCostAvgUsd} USD<br><span class="text-sm text-slate-600">Средняя сумма будет добавлена к итоговой цене (по курсу ЦБ).</span></div>`;
+            return html;
+        }
+        function getStep3Content() {
+            return `
+                <h3 class="text-xl font-bold mb-3">🚛 Доставка автовозом по территории РФ</h3>
+                <div class="space-y-3">
+                    <div><label class="block text-sm font-medium">Расстояние, км</label><input type="number" id="transitRange" class="w-full rounded-lg border p-2" value="1000" min="1"></div>
+                    <button id="doTransitCalc" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Рассчитать</button>
+                    <div id="transitResult" class="bg-slate-50 p-3 rounded-lg text-sm hidden"></div>
+                    <p class="text-xs text-slate-400">После расчёта цена доставки добавится к итоговой сумме.</p>
+                </div>
+            `;
+        }
+        function getStep4Content() {
+            return `
+                <h3 class="text-xl font-bold mb-3">📋 Таможенное оформление</h3>
+                <p class="text-slate-700 mb-3">Подробный расчёт пошлины, сбора, утильсбора и НДС выполняется в калькуляторе выше.</p>
+                <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                    <span class="font-semibold">🧾 Оформление СБКТС и ЭПТС:</span> от 27 000 до 45 000 ₽ (обязательно для всех иномарок).<br>
+                    <span class="text-sm text-slate-600">Максимальная сумма (45 000 ₽) автоматически добавлена в общую стоимость.</span>
+                </div>
+            `;
+        }
+        function getStep5Content() {
+            return `<h3 class="text-xl font-bold mb-3">📄 Постановка на учёт в ГИБДД</h3><p class="text-slate-700">После получения ЭПТС и СБКТС необходимо обратиться в любое отделение ГИБДД для регистрации.</p>`;
+        }
+
+        function bindStepButtons() {
+            document.querySelectorAll('[data-step]').forEach(btn => {
+                btn.removeEventListener('click', stepHandler);
+                btn.addEventListener('click', stepHandler);
+            });
+        }
+        async function stepHandler(e) {
+            const step = parseInt(e.currentTarget.dataset.step);
+            let content = '';
+            if(step === 1) content = getStep1Content();
+            else if(step === 2) content = getStep2Content();
+            else if(step === 3) content = getStep3Content();
+            else if(step === 4) content = getStep4Content();
+            else if(step === 5) content = getStep5Content();
+            openModal(content);
+
+            if(step === 3) {
+                setTimeout(() => {
+                    const calcBtn = document.getElementById('doTransitCalc');
+                    if(calcBtn) {
+                        calcBtn.onclick = async () => {
+                            const rangeInput = document.getElementById('transitRange');
+                            const range = parseFloat(rangeInput.value);
+                            const resultDiv = document.getElementById('transitResult');
+                            if(isNaN(range) || range < 1) { resultDiv.innerHTML = '<span class="text-red-600">Введите корректное расстояние (≥1 км)</span>'; resultDiv.classList.remove('hidden'); return; }
+                            resultDiv.innerHTML = '<span class="loader"></span> Расчёт...'; resultDiv.classList.remove('hidden');
+                            try {
+                                const resp = await fetch('/api/calculator/transit', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({range}) });
+                                if(!resp.ok) throw new Error();
+                                const data = await resp.json();
+                                transitCostRub = data.avgCost;
+                                resultDiv.innerHTML = `<div class="space-y-1"><p><strong>Минимальная:</strong> ${formatNumber(data.minCost)} ₽</p><p><strong>Максимальная:</strong> ${formatNumber(data.maxCost)} ₽</p><p><strong>Средняя:</strong> ${formatNumber(data.avgCost)} ₽</p><p><strong>Тариф:</strong> ${data.minCostTransfer} – ${data.maxCostTransfer} ₽/км</p></div><p class="text-green-700 mt-2">✅ Стоимость доставки добавлена в итог</p>`;
+                                updateFullTotal();
+                            } catch(err) { resultDiv.innerHTML = '<span class="text-red-600">Ошибка расчёта доставки</span>'; }
+                        };
+                    }
+                }, 50);
+            }
+            if(step === 2) {
+                setTimeout(() => {
+                    if(!document.getElementById('step2AddBtn')) {
+                        const addBtn = document.createElement('button');
+                        addBtn.id = 'step2AddBtn';
+                        addBtn.textContent = '✅ Добавить средние расходы к итогу';
+                        addBtn.className = 'mt-4 bg-emerald-600 text-white px-4 py-2 rounded-full text-sm hover:bg-emerald-700';
+                        addBtn.onclick = () => {
+                            const data = countryData[currentCountry];
+                            updateExtraCostsFromUsd(data.totalCostAvgUsd);
+                            closeModal();
+                        };
+                        modalContent.appendChild(addBtn);
+                    }
+                }, 50);
+            }
+        }
+
+        // ---------- ПЕРЕКЛЮЧЕНИЕ СТРАНЫ ----------
+        function setCountry(countryCode) {
+            currentCountry = countryCode;
+            extraCostsRub = 0;
+            transitCostRub = 0;
+            updateFullTotal();
+        }
+
+        // ---------- КАТАЛОГ ----------
+        async function loadCatalog(reset=true) {
+            if(isLoadingCatalog) return;
+            if(reset) { currentCatalogPage=0; hasMoreCatalog=true; catalogGrid.innerHTML='<div class="col-span-full text-center py-10">Загрузка...</div>'; loadMoreBtn.classList.add('hidden'); }
+            if(!hasMoreCatalog && !reset) return;
+            isLoadingCatalog=true;
+            try {
+                const url = `/api/catalog/privileged?page=${currentCatalogPage}&size=${CATALOG_SIZE}`;
+                const resp = await fetch(url);
+                if(!resp.ok) throw new Error();
+                const slice = await resp.json();
+                const cars = slice.content;
+                hasMoreCatalog = slice.hasNext;
+                if(reset) catalogGrid.innerHTML='';
+                if(!cars.length && reset) { catalogGrid.innerHTML='<div class="col-span-full text-center">Нет данных</div>'; return; }
+                cars.forEach(car => {
+                    const img = car.imageUrls?.length ? car.imageUrls[0] : `https://placehold.co/300x200/1e3a8a/white?text=${encodeURIComponent(car.brand+' '+car.model)}`;
+                    const card = document.createElement('div');
+                    card.className = 'bg-slate-50 rounded-2xl overflow-hidden shadow-sm border';
+                    card.innerHTML = `<img src="${img}" class="h-44 w-full object-cover" onerror="this.src='https://placehold.co/300x200/cccccc/666666?text=No+Image'"><div class="p-4"><div class="font-bold">${car.brand} ${car.model}</div><div class="text-sm text-slate-600">📅 ${car.year} · ${car.wheelPosition === 'LEFT' ? 'Левый руль' : 'Правый руль'}</div></div>`;
+                    catalogGrid.appendChild(card);
+                });
+                currentCatalogPage++;
+                if(hasMoreCatalog) loadMoreBtn.classList.remove('hidden');
+                else loadMoreBtn.classList.add('hidden');
+            } catch(e) { console.error(e); if(reset) catalogGrid.innerHTML='<div class="col-span-full text-center text-red-600">Ошибка</div>'; }
+            finally { isLoadingCatalog=false; }
+        }
+
+        // ---------- ПЕРЕКЛЮЧЕНИЕ МОЩНОСТИ ----------
+        function setPowerUnit(unit) {
+            let val = parseFloat(powerInput.value) || 0;
+            if(unit === 'hp') {
+                if(powerUnit === 'kw') val = val * 1.35962;
+                powerInput.max = HP_LIMIT;
+                powerUnit = 'hp';
+                hpBtn.classList.add('active'); kwBtn.classList.remove('active');
+                powerInput.value = Math.min(val, HP_LIMIT).toFixed(0);
+            } else {
+                if(powerUnit === 'hp') val = val / 1.35962;
+                powerInput.max = KW_LIMIT;
+                powerUnit = 'kw';
+                kwBtn.classList.add('active'); hpBtn.classList.remove('active');
+                powerInput.value = Math.min(val, KW_LIMIT).toFixed(1);
+            }
+            enforcePowerLimit();
+            triggerCalc();
+        }
+
+        // ---------- ИНИЦИАЛИЗАЦИЯ ----------
+        function init() {
+            fetchExchangeRates();
+            setInterval(fetchExchangeRates, 3600000);
+
+            const countryTabs = document.querySelectorAll('[data-country-tab]');
+            countryTabs.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    countryTabs.forEach(b => { b.classList.remove('bg-blue-600','text-white','shadow'); b.classList.add('bg-slate-200','text-slate-700'); });
+                    btn.classList.add('bg-blue-600','text-white','shadow');
+                    btn.classList.remove('bg-slate-200','text-slate-700');
+                    setCountry(btn.dataset.countryTab);
+                });
+            });
+            setCountry('CN');
+
+            const calcInputs = [priceInput, currencySelect, volumeInput, powerInput, ageSelect, importerSelect, countrySelect];
+            calcInputs.forEach(el => el.addEventListener('input', () => { enforcePowerLimit(); triggerCalc(); }));
+            hpBtn.addEventListener('click', () => setPowerUnit('hp'));
+            kwBtn.addEventListener('click', () => setPowerUnit('kw'));
+            powerInput.addEventListener('blur', enforcePowerLimit);
+            triggerCalc();
+
+            document.getElementById('recalcFullTotal').addEventListener('click', () => updateFullTotal());
+
+            closeModalBtn.addEventListener('click', closeModal);
+            modalConfirmBtn.addEventListener('click', closeModal);
+            modalOverlay.addEventListener('click', (e) => { if(e.target === modalOverlay) closeModal(); });
+
+            openCatalogBtn.addEventListener('click', () => { loadCatalog(true); catalogModal.classList.remove('invisible','opacity-0'); catalogModal.classList.add('visible','opacity-100'); });
+            closeCatalogBtn.addEventListener('click', () => catalogModal.classList.add('invisible','opacity-0'));
+            catalogModal.addEventListener('click', (e) => { if(e.target === catalogModal) catalogModal.classList.add('invisible','opacity-0'); });
+            loadMoreBtn.addEventListener('click', () => loadCatalog(false));
+            document.getElementById('showRoadmapBtn').addEventListener('click', () => document.getElementById('roadmapSection').scrollIntoView({behavior:'smooth'}));
+
+            bindStepButtons();
+        }
+
+        init();
+    })();
+</script>
+</body>
+</html>
