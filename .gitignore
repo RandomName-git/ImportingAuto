@@ -12,6 +12,10 @@ target/
 *.iml
 *.ipr
 .idea
+.env
+.gigaide
+полезные данные.txt
+пошаговая инструкция.txt
 
 ### Eclipse ###
 .apt_generated
